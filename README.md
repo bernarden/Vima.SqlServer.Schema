@@ -1,0 +1,1 @@
+# Vima.SqlServer.Schema
