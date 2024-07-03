@@ -13,8 +13,8 @@ internal class Program
     private const string ConnectionString =
         @"Data Source=.\SQLEXPRESS;Integrated Security=true;Initial Catalog=Northwind";
 
-    private static readonly List<string> DefaultSchemasForSqlServer2017 = new()
-    {
+    private static readonly List<string> DefaultSchemasForSqlServer2017 =
+    [
         "db_accessadmin",
         "db_backupoperator",
         "db_datareader",
@@ -28,12 +28,12 @@ internal class Program
         "guest",
         "INFORMATION_SCHEMA",
         "sys"
-    };
+    ];
 
     private static void Main()
     {
-        using var connection = new SqlConnection(ConnectionString);
-        var databaseSchema = GetDatabaseSchema(connection);
+        using SqlConnection connection = new(ConnectionString);
+        DatabaseSchema databaseSchema = GetDatabaseSchema(connection);
 
         string schemas = GenerateCreateSchemaStatements(databaseSchema);
         string tables = GenerateCreateTableStatements(databaseSchema);
@@ -49,7 +49,7 @@ internal class Program
 
     private static DatabaseSchema GetDatabaseSchema(DbConnection connection)
     {
-        var dbReader = new DatabaseReader(connection);
+        DatabaseReader dbReader = new(connection);
         dbReader.AllSchemas();
         return dbReader.ReadAll();
     }
@@ -61,26 +61,27 @@ internal class Program
             return;
         }
 
-        var currentDirectory = Directory.GetCurrentDirectory();
-        var directory = Directory.GetParent(currentDirectory)?.Parent?.Parent;
+        string currentDirectory = Directory.GetCurrentDirectory();
+        DirectoryInfo? directory = Directory.GetParent(currentDirectory)?.Parent?.Parent;
         if (directory == null)
         {
             return;
         }
 
-        var outputFilePath = Path.Combine(directory.FullName, fileName);
+        string outputFilePath = Path.Combine(directory.FullName, fileName);
         File.WriteAllText(outputFilePath, text);
     }
 
     private static string GenerateCreateSchemaStatements(DatabaseSchema databaseSchema)
     {
-        var customSchemas = databaseSchema.Schemas
+        List<DatabaseDbSchema> customSchemas = databaseSchema.Schemas
             .Where(x => !DefaultSchemasForSqlServer2017.Contains(x.Name))
-            .OrderBy(x => x.Name).ToList();
+            .OrderBy(x => x.Name)
+            .ToList();
         if (customSchemas.Count == 0) return string.Empty;
 
         StringBuilder stringBuilder = new();
-        foreach (var schema in customSchemas)
+        foreach (DatabaseDbSchema? schema in customSchemas)
         {
             stringBuilder.AppendLine($"CREATE SCHEMA [{schema.Name}]\nGO\n");
         }
@@ -93,18 +94,19 @@ internal class Program
     {
         if (databaseSchema.Tables.Count == 0) return string.Empty;
 
-        var tablesGenerator = new DdlGeneratorFactory(SqlType.SqlServer).AllTablesGenerator(databaseSchema);
+        ITablesGenerator? tablesGenerator =
+            new DdlGeneratorFactory(SqlType.SqlServer).AllTablesGenerator(databaseSchema);
         tablesGenerator.IncludeSchema = true;
         return RemoveMultipleConsecutiveNewLineCharacters(tablesGenerator.Write());
     }
 
     private static string GenerateCreateViewStatements(DatabaseSchema databaseSchema)
     {
-        var views = databaseSchema.Views;
+        List<DatabaseView>? views = databaseSchema.Views;
         if (views.Count == 0) return string.Empty;
 
         StringBuilder stringBuilder = new();
-        foreach (var view in views.OrderBy(x => x.DatabaseSchema).ThenBy(x => x.Name))
+        foreach (DatabaseView? view in views.OrderBy(x => x.DatabaseSchema).ThenBy(x => x.Name))
         {
             stringBuilder.AppendLine(view.Sql + "\nGO\n");
             stringBuilder.AppendLine();
@@ -116,11 +118,11 @@ internal class Program
 
     private static string GenerateCreateFunctionStatements(DatabaseSchema databaseSchema)
     {
-        var functions = databaseSchema.Functions;
+        List<DatabaseFunction>? functions = databaseSchema.Functions;
         if (functions.Count == 0) return string.Empty;
 
         StringBuilder stringBuilder = new();
-        foreach (var function in functions.OrderBy(x => x.DatabaseSchema).ThenBy(x => x.Name))
+        foreach (DatabaseFunction? function in functions.OrderBy(x => x.DatabaseSchema).ThenBy(x => x.Name))
         {
             stringBuilder.AppendLine(function.Sql + "\nGO\n");
             stringBuilder.AppendLine();
@@ -132,11 +134,12 @@ internal class Program
 
     private static string GenerateCreateStoredProcedureStatements(DatabaseSchema databaseSchema)
     {
-        var storedProcedures = databaseSchema.StoredProcedures;
+        List<DatabaseStoredProcedure>? storedProcedures = databaseSchema.StoredProcedures;
         if (storedProcedures.Count == 0) return string.Empty;
 
         StringBuilder stringBuilder = new();
-        foreach (var storedProcedure in storedProcedures.OrderBy(x => x.DatabaseSchema).ThenBy(x => x.Name))
+        foreach (DatabaseStoredProcedure? storedProcedure in storedProcedures.OrderBy(x => x.DatabaseSchema)
+                     .ThenBy(x => x.Name))
         {
             stringBuilder.AppendLine(storedProcedure.Sql + "\nGO\n");
             stringBuilder.AppendLine();
@@ -148,8 +151,10 @@ internal class Program
 
     private static string RemoveMultipleConsecutiveNewLineCharacters(string source)
     {
+#pragma warning disable SYSLIB1045 // Convert to 'GeneratedRegexAttribute'.
         string textWithStandardizedNewLineCharacter = Regex.Replace(source, @"(?:\r\n|[\r\n])", "\n");
         string[] listOfLinesWithoutNewLineCharacters = Regex.Split(textWithStandardizedNewLineCharacter, "\n{2,}");
         return string.Join("\n\n", listOfLinesWithoutNewLineCharacters);
+#pragma warning restore SYSLIB1045 // Convert to 'GeneratedRegexAttribute'.
     }
 }
